@@ -1,4 +1,5 @@
 import random
+import sys
 from turtle import Screen, Turtle
 from time import sleep
 
@@ -7,12 +8,22 @@ wd.setup(width=800, height=600)
 wd.bgcolor('black')
 wd.title("Pong")
 wd.tracer(0)
+BOTTOM = -300
+UPPER = 300
+
+
+def dist_up(turtle):
+    return abs(turtle.ycor() - UPPER)
+
+
+def dist_bot(turtle):
+    return abs(turtle.ycor() - BOTTOM)
 
 
 class Player:
     def __init__(self, player_num=1):
         self.position = [0, 20, 40, -20, -40]
-        self.player_body = []
+        self.body = []
         self.player_num = player_num
         if self.player_num == 1:
             self.X_CORD = -350
@@ -28,39 +39,43 @@ class Player:
             p.seth(90)
             p.goto(self.X_CORD, pos)
 
-            self.player_body.append(p)
+            self.body.append(p)
 
     def move_up(self):
-        distance_from_border = self.player_body[2].distance(self.X_CORD, 300)
+        distance_from_border = dist_up(self.body[2])
         if distance_from_border > 20:
-            for part in self.player_body:
+            for part in self.body:
                 part.fd(20)
         else:
             pass
 
     def move_down(self):
-        distance_from_border = self.player_body[2].distance(self.X_CORD, -245)
+        distance_from_border = dist_bot(self.body[4])
         if distance_from_border > 20:
-            for part in self.player_body:
+            for part in self.body:
                 part.bk(20)
         else:
             pass
 
     def move(self):
         wd.listen()
-        wd.onkeypress(self.move_up, 'Up')
-        wd.onkeypress(self.move_down, 'Down')
+        if self.player_num == 1:
+            wd.onkeypress(self.move_up, 'w')
+            wd.onkeypress(self.move_down, 's')
+        if self.player_num == 2:
+            wd.onkeypress(self.move_up, 'Up')
+            wd.onkeypress(self.move_down, 'Down')
 
     def random_movement(self):
-        distance_from_bottom = self.player_body[2].distance(self.X_CORD, -245)
-        distance_from_top = self.player_body[2].distance(self.X_CORD, 300)
-        for part in self.player_body:
+        distance_from_bottom = self.body[2].distance(self.X_CORD, BOTTOM)
+        distance_from_top = self.body[2].distance(self.X_CORD, UPPER)
+        for part in self.body:
             part.fd(8)
         if distance_from_top < 10:
-            for part in self.player_body:
+            for part in self.body:
                 part.seth(270)
         elif distance_from_bottom < 10:
-            for part in self.player_body:
+            for part in self.body:
                 part.seth(90)
 
 
@@ -70,32 +85,73 @@ class Ball:
         self.ball.shape('square')
         self.ball.color('white')
         self.ball.pu()
-        self.ball.seth(random.randint(0, 360) )
-        self.start_angle()
+        self.ball.seth(random.randint(0, 360))
+        self.set_angle()
 
-    def start_angle(self):
-        angle = [num for num in range(90, 270) if num not in range(75, 106) and num not in range(255, 286)]
-        self.ball.seth(angle[random.randint(0, len(angle) - 1)])
+    def set_angle(self, player_scorer=0):
+        if player_scorer != 0:
+            if player_scorer == 1:
+                angle = [num for num in range(0, 360) if num not in range(30, 330)]
+                self.ball.seth(angle[random.randint(0, len(angle) - 1)])
+            elif player_scorer == 2:
+                angle = [num for num in range(150, 210)]
+                self.ball.seth(angle[random.randint(0, len(angle) - 1)])
+        else:
+            angle = [num for num in range(0, 360) if num not in range(30, 150) and num not in range(210, 330)]
+            self.ball.seth(angle[random.randint(0, len(angle) - 1)])
 
     def move(self):
-        self.ball.fd(2)
+        self.ball.fd(5)
 
     def hit_player(self, player):
-        for part in player.player_body:
-            if abs(self.ball.xcor()) + 10 in range(int(player.player_body[0].xcor() - 10), int(player.player_body[0].xcor() + 11)):
-                if self.ball.heading() < 90:
-                    self.ball.seth(self.ball.heading() + 90)
-                elif self.ball.heading() > 90:
-                    self.ball.seth(self.ball.heading() - 90)
+        pass
 
-    def hit_wall(self):
-        distance_from_bottom = self.ball.distance(self.ball.xcor(), -245)
-        distance_from_top = self.ball.distance(self.ball.xcor(), 300)
-        if distance_from_top < 10 or distance_from_bottom < 10:
-            if self.ball.heading() < 180:
-                self.ball.seth(self.ball.heading() + 90)
-            elif self.ball.heading() > 180:
-                self.ball.seth(self.ball.heading() - 90)
+    def bounce(self, players):
+        if dist_up(self.ball) < 10 or dist_bot(self.ball) < 10:
+            self.ball.seth(360 - self.ball.heading())
+        for player in players:
+            for part in player.body:
+                if self.ball.distance(part.position()) < 10:
+                    self.ball.seth(540 - self.ball.heading())
+
+    def return_position(self, player_scorer=0):
+        self.ball.goto(0, 0)
+        self.set_angle(player_scorer)
+
+
+class Scoreboard:
+    def __init__(self):
+        self.players_points = [0, 0]
+        x = 100
+        y = 150
+        positions = [(-x, y), (x, y)]
+        self.writers = []
+        for pos in positions:
+            w = Turtle()
+            w.hideturtle()
+            w.pu()
+            w.goto(pos)
+            w.pencolor('white')
+            self.writers.append(w)
+
+    def point(self, ball):
+        if ball.ball.xcor() < -400:
+            self.players_points[1] += 1
+            ball.return_position(2)
+        elif ball.ball.xcor() > 400:
+            self.players_points[0] += 1
+            ball.return_position(1)
+
+    def write(self):
+        for i in [0, 1]:
+            self.writers[i].clear()
+            self.writers[i].write(f"{self.players_points[i]}", align='center', font=('Pong Score', 100, 'normal'))
+
+    def check_win(self):
+        for i in [0, 1]:
+            if self.players_points[i] == 9:
+                print(f"Player {i + 1} won!")
+                sys.exit()
 
 
 player1 = Player(1)
@@ -103,14 +159,18 @@ player1.create()
 player2 = Player(2)
 player2.create()
 game_ball = Ball()
+score = Scoreboard()
 game_on = True
 while game_on:
     sleep(0.01)
     wd.update()
     player1.move()
-    player2.random_movement()
+    player2.move()
+    # player2.random_movement()
     game_ball.move()
-    game_ball.hit_player(player1)
-    game_ball.hit_player(player2)
-    game_ball.hit_wall()
+    game_ball.bounce([player1, player2])
+    score.point(game_ball)
+    score.write()
+    score.check_win()
+
 wd.exitonclick()
